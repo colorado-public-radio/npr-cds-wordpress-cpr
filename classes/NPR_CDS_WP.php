@@ -132,12 +132,12 @@ class NPR_CDS_WP {
 		}
 	}
 
-	function extract_asset_id ( $href ): bool|string {
+	function extract_asset_id( $href ): bool|string {
 		$href_xp = explode( '/', $href );
 		return end( $href_xp );
 	}
 
-	function extract_profiles ( $story ): array {
+	function extract_profiles( $story ): array {
 		$output = [];
 		foreach ( $story as $p ) {
 			$p_xp = explode( '/', $p->href );
@@ -146,7 +146,7 @@ class NPR_CDS_WP {
 		return $output;
 	}
 
-	function get_document ( $href ): stdClass|WP_Error {
+	function get_document( $href ): stdClass|WP_Error {
 		$url = NPR_CDS_PULL_URL . $href;
 		$options = $this->get_token_options();
 		$response = wp_remote_get( $url, $options );
@@ -239,8 +239,10 @@ class NPR_CDS_WP {
 				}
 
 				$npr_has_video = FALSE;
+				$npr_has_layout = FALSE;
 				$npr_layout = $this->get_body_with_layout( $story );
 				if ( !empty( $npr_layout['body'] ) ) {
+					$npr_has_layout = TRUE;
 					$story->body = $npr_layout['body'];
 					$npr_has_video = $npr_layout['has_video'];
 				}
@@ -369,7 +371,8 @@ class NPR_CDS_WP {
 					NPR_PUB_DATE_META_KEY		  => $story->publishDateTime,
 					NPR_STORY_DATE_META_KEY		  => $story->publishDateTime,
 					NPR_LAST_MODIFIED_DATE_KEY	  => $story->editorialLastModifiedDateTime,
-					NPR_STORY_HAS_VIDEO_META_KEY  => $npr_has_video
+					NPR_STORY_HAS_VIDEO_META_KEY  => $npr_has_video,
+					NPR_STORY_HAS_LAYOUT_META_KEY => $npr_has_layout
 				];
 				if ( $npr_layout['has_video_streaming'] ) {
 					$metas[NPR_HAS_VIDEO_STREAMING_META_KEY] = $npr_layout['has_video_streaming'];
@@ -718,9 +721,9 @@ class NPR_CDS_WP {
 	 */
 	function send_request( string $json, int $post_ID ): void {
 		$error_text = '';
-		$org_id = get_option( 'npr_cds_org_id' );
+		$service_id = get_option( 'npr_cds_org_id' );
 		$prefix = get_option( 'npr_cds_prefix' );
-		if ( !empty( $org_id ) && !empty( $prefix ) ) {
+		if ( !empty( $service_id ) && !empty( $prefix ) ) {
 			$cds_id = $prefix . '-' . $post_ID;
 			$options = $this->get_token_options();
 			$url = get_option( 'npr_cds_push_url' ) . '/' . self::NPR_CDS_VERSION . '/documents/' . $cds_id;
@@ -747,16 +750,16 @@ class NPR_CDS_WP {
 
 					if ( $body ) {
 						$response_json = json_decode( $body );
-						$error_text .= '  API Error Message = ' . $response_json->message;
+						$error_text .= '  API Error Message = ' . print_r( $response_json, true );
 					}
-					error_log( 'Error returned from NPR Story API with status code other than 200 OK: ' . $error_text ); // debug use
+					error_log( 'Error returned from NPR CDS with status code other than 200 OK: ' . $error_text ); // debug use
 				}
 			} else {
-				$error_text = 'WP_Error returned when sending story with post_ID ' . $post_ID . ' for url ' . $url . ' to NPR Story API:' . $result->get_error_message();
+				$error_text = 'WP_Error returned when sending story with post_ID ' . $post_ID . ' for url ' . $url . ' to NPR CDS:' . $result->get_error_message();
 				error_log( $error_text ); // debug use
 			}
 		} else {
-			$error_text = 'OrgID was not set when tried to push post_ID ' . $post_ID . ' to the NPR Story API.';
+			$error_text = 'OrgID was not set when tried to push post_ID ' . $post_ID . ' to the NPR CDS.';
 			error_log( $error_text ); // debug use
 		}
 
@@ -983,9 +986,9 @@ class NPR_CDS_WP {
 						if ( !empty( $asset_current->documentLink ) ) {
 							$promo_card     = $this->get_document( $asset_current->documentLink->href );
 							$promo_card_url = '';
-							if ( ! is_wp_error( $promo_card ) ) {
+							if ( ! is_wp_error( $promo_card ) && !empty( $promo_card->webPages ) ) {
 								foreach ( $promo_card->webPages as $web ) {
-									if ( in_array( 'canonical', $web->rels ) ) {
+									if ( !empty( $web->rels ) && in_array( 'canonical', $web->rels ) ) {
 										$promo_card_url = $web->href;
 									}
 								}
@@ -1021,7 +1024,7 @@ class NPR_CDS_WP {
 								$body_with_layout .= '<p><iframe class="npr-embed-audio" style="width: 100%; height: 239px;" src="' . $asset_current->embeddedPlayerLink->href . '"></iframe></p>';
 							} elseif ( $asset_current->isDownloadable ) {
 								foreach ( $asset_current->enclosures as $enclose ) {
-									if ( $enclose->type == 'audio/mpeg' && !in_array( 'premium', $enclose->rels ) ) {
+									if ( $enclose->type == 'audio/mpeg' && empty( $enclose->rels ) || !in_array( 'premium', $enclose->rels ) ) {
 										$body_with_layout .= '[audio mp3="' . $enclose->href . '"][/audio]';
 									}
 								}

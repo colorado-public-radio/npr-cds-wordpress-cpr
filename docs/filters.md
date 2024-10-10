@@ -73,3 +73,10 @@ Aside from the settings presented inside the WordPress dashboard, there are also
 * **Arguments**
   * `$content (string)`: the article content
 * **Return**: `$content`
+
+## `npr_cds_push_service_ids_filter`
+* **Function**: Allow a site to modify the ownership of a CDS document before pushing to the CDS 
+* **Arguments**
+  * `$service_id (string)`: a comma-separated list of service IDs, which are individually formatted as `s###`
+  * `$post (WP_Post)`: the WordPress Post object that is being pushed to the CDS
+* **Return**: `$service_id`

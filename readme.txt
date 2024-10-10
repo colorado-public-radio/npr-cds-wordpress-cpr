@@ -4,10 +4,10 @@ Original developers: NPRDS, INN Labs
 Donate link: https://www.npr.org/support
 Tags: npr, news, public radio, api
 Requires at least: 4.0
-Tested up to: 6.5.2
+Tested up to: 6.6
 Requires PHP: 8.0
-Version: 1.2.7
-Stable tag: 1.2.7
+Version: 1.3
+Stable tag: 1.3
 Author: Open Public Media
 Author URI: https://github.com/OpenPublicMedia/
 License: GPLv2
@@ -52,21 +52,21 @@ There is documentation in the NPR's [Github site](https://npr.github.io/content-
 
 == Screenshots ==
 
-NPR Story API Plugin Settings screen
+NPR CDS Plugin Settings screen
 
-![NPR Story API Plugin Settings screen](docs/assets/img/npr-api-wp-plugin-settings.png)
+![NPR CDS Plugin Settings screen](docs/assets/img/npr-api-wp-plugin-settings.png)
 
-NPR Story API multiple get settings
+NPR CDS multiple get settings
 
-![NPR Story API multiple get settings](docs/assets/img/npr-api-multiple-get-settings.png)
+![NPR CDS multiple get settings](docs/assets/img/npr-api-multiple-get-settings.png)
 
 Get NPR Stories link in the dashboard
 
 ![Get NPR Stories link in the dashboard](docs/assets/img/get-npr-stories-link.png)
 
-Getting an NPR Story by Story ID
+Getting an NPR Story by CDS ID
 
-![Getting NPR Stories by Story ID](docs/assets/img/get-npr-stories-link.png)
+![Getting NPR Stories by CDS ID](docs/assets/img/get-npr-stories-link.png)
 
 NPR Stories having been retrieved
 
@@ -74,6 +74,35 @@ NPR Stories having been retrieved
 
 
 == Changelog ==
+= V.1.3 =
+* "Org ID" renamed to "Service ID" in various places to try to better reflect the guidance from NPR
+* Service IDs in `settings.php` can now be a comma-separated list, if all posts will be co-owned
+* Added `npr_cds_push_service_ids_filter` so ownership can be modified on an ad-hoc basis, if needed
+* Fixed a bug where, under certain conditions, checking audio enclosures for the premium value can trigger an exception (h/t @areynold)
+* Laying groundwork for potential WP-JSON endpoint
+* Minor formatting and bug fixes
+
+= V.1.2.11 =
+* Setting the `npr_has_layout` flag for imported articles to help with backwards compatibility (h/t @tamw-wnet)
+* Fixed a potential fatal error in `NPR_CDS_WP` when passing promo card rels
+
+= V1.2.10 =
+* Fixed a bug where audio files were getting attached to stories without the proper profiles, leading to push errors
+
+= V1.2.9 =
+* `npr_cds_show_message()` only echoes in admin dashboard
+* Promo cards without valid `webPages` array are ignored
+
+= V1.2.8.1 =
+* Fixed error logging bug which was causing blank errors on failed uploads
+
+= V1.2.8 =
+* Changed the activation function to fully remove all of the old NPR Story API options after migrating them
+* Changed the deactivation function to save all of the previous settings into a site option and delete the individual options
+* Added functions to allow for restoring settings from a previous install or deleting those stored settings
+* Updated a bunch of stray references to the old Story API
+* Documentation updates
+
 = V1.2.7 =
 * `NPR_CDS_WP` has been updated to block/ignore stories and assets that have been marked as restricted in the CDS (meaning they are not eligible for syndication)
 
