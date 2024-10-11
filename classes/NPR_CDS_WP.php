@@ -721,18 +721,33 @@ class NPR_CDS_WP {
 	 */
 	function send_request( string $json, int $post_ID ): void {
 		$error_text = '';
-		$service_id = get_option( 'npr_cds_org_id' );
-		$prefix = get_option( 'npr_cds_prefix' );
+
+		// DP-56: Customization for KRCC communication with NPR CDS Plugin
+		$options = $this->get_token_options();
+		$options = apply_filters( 'npr_pre_article_push', $options, $post_ID, $json );
+		if ( !empty( $options['section_cds'] ) && $options['section_cds'] === 'krcc' ) {
+			$service_id = $options['npr_cds_org_id_krcc'];
+			$prefix = $options['npr_cds_prefix_krcc'];
+			$json = $options['json_krcc'];
+		} else {
+			$service_id = get_option( 'npr_cds_org_id' );
+			$prefix = get_option( 'npr_cds_prefix' );
+		}
+		// DP-56: End of customization for KRCC
+
+		// Commented below are the CDS variables moved above out of conditional scope for DP-56.
+		// $service_id = get_option( 'npr_cds_org_id' );
+		// $prefix = get_option( 'npr_cds_prefix' );
 		if ( !empty( $service_id ) && !empty( $prefix ) ) {
 			$cds_id = $prefix . '-' . $post_ID;
-			$options = $this->get_token_options();
+			// $options = $this->get_token_options();
 			$url = get_option( 'npr_cds_push_url' ) . '/' . self::NPR_CDS_VERSION . '/documents/' . $cds_id;
 			npr_cds_error_log( 'Sending json = ' . $json );
 
 			$options['body'] = $json;
 			$options['method'] = 'PUT';
 			$options['timeout'] = 30;
-			$options = apply_filters( 'npr_pre_article_push', $options, $cds_id );
+			// $options = apply_filters( 'npr_pre_article_push', $options, $cds_id );
 			$result = wp_remote_request( $url, $options );
 			if ( !is_wp_error( $result ) ) {
 				if ( $result['response']['code'] == self::NPR_CDS_STATUS_OK ) {
