@@ -373,7 +373,7 @@ function npr_cds_to_json( $post ): bool|string {
 			$audio_enc->type = $audio->post_mime_type;
 
 			/**
-			 * Allows modification of audio file before it is added to the story object.
+			 * DP-320: Allows modification of audio file before it is added to the story object.
 			 *
 			 * @param WP_Post  $audio     The WP attachment object.
 			 * @param stdClass $audio_enc The enclosure object to be added.
