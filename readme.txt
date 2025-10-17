@@ -75,6 +75,7 @@ NPR Stories having been retrieved
 
 == Changelog ==
 = V.1.3.7 =
+* Stories submitted to the CDS can now be featured on the NPR homepage. Most the requirements for feature were included in the plugin previously, but the features require a 16:9 image, which this update addresses. This update creates a new image size which is a strict 16:9 crop, and also formats and sends more image crops to the CDS, with the full sized image as a backstop.
 * Implementing filters for push post type, custom title, custom body, and custom byline (h/t @justinferrell for the suggestion)
 
 = V.1.3.6.1 =
