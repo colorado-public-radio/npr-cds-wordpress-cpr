@@ -290,14 +290,17 @@ function npr_cds_to_json( $post ): bool|string {
 		}
 
 		if (
-			!empty( $custom_credit ) &&
-			!empty( $custom_agency ) &&
-			$custom_credit == $custom_agency &&
-			( str_contains( $custom_credit, '/' ) || str_contains( $custom_credit, ',' ) )
+			(
+				( !empty( $custom_credit ) && empty( $custom_agency ) ) ||
+				( !empty( $custom_credit ) && !empty( $custom_agency ) && $custom_credit == $custom_agency )
+			) &&
+			( str_contains( $custom_credit, '/' ) || str_contains( $custom_credit, '|' ) || str_contains( $custom_credit, ',' ) )
 		) {
 			$exp_separator = '/';
 			if ( str_contains( $custom_credit, '|' ) ) {
 				$exp_separator = '|';
+			} elseif ( str_contains( $custom_credit, ',' ) ) {
+				$exp_separator = ',';
 			}
 			$parts = explode( $exp_separator, $custom_credit );
 			$custom_credit = trim( $parts[0] );
@@ -342,7 +345,7 @@ function npr_cds_to_json( $post ): bool|string {
 		$image_asset->provider = $custom_agency;
 		$image_asset->enclosures = [];
 
-		$image_crops = [ 'large', 'medium', 'npr-cds-wide' ];
+		$image_crops = [ 'large', 'medium', 'npr-cds-wide', 'npr-cds-square' ];
 		if ( !empty( $image_meta['sizes'] ) ) {
 			$primary_crop = 'npr-cds-wide';
 			if ( empty( $image_meta['sizes']['npr-cds-wide'] ) ) {
@@ -350,8 +353,11 @@ function npr_cds_to_json( $post ): bool|string {
 					$primary_crop = 'large';
 				} elseif ( !empty( $image_meta['sizes']['medium'] ) ) {
 					$primary_crop = 'medium';
+				} elseif ( !empty( $image_meta['sizes']['npr-cds-square'] ) ) {
+					$primary_crop = 'npr-cds-square';
 				}
 			}
+		
 			foreach ( $image_meta['sizes'] as $key => $value ) {
 				if ( !in_array( $key, $image_crops ) ) {
 					continue;

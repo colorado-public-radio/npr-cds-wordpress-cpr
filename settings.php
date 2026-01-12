@@ -1094,11 +1094,19 @@ class NPR_CDS {
 	public function view_uploads(): void {
 		$api_key = NPR_CDS_WP::get_cds_token();
 		$pull_url = NPR_CDS_PULL_URL;
+		$service_id = get_option( 'npr_cds_org_id' );
+		$valid = true;
 		if ( !$api_key ) {
 			npr_cds_show_message( 'You do not currently have a CDS token set. <a href="' . admin_url( 'admin.php?page=npr-cds-settings' ) . '">Set your CDS token here.</a>', TRUE );
+			$valid = false;
 		}
 		if ( !$pull_url ) {
 			npr_cds_show_message( 'You do not currently have a CDS Pull URL set. <a href="' . admin_url( 'admin.php?page=npr-cds-settings' ) . '">Set your CDS Pull URL here.</a>', TRUE );
+			$valid = false;
+		}
+		if ( empty( $service_id ) ) {
+			npr_cds_show_message( 'You do not currently have an organization ID set. <a href="' . admin_url( 'admin.php?page=npr-cds-settings' ) . '">Set your organization ID here.</a>', TRUE );
+			$valid = false;
 		} ?>
 		<style>
 			details {
@@ -1226,6 +1234,10 @@ class NPR_CDS {
 		<div class="wrap">
 			<h1>NPR CDS: View Uploaded Stories</h1>
 		<?php
+		if ( !$valid ) {
+			echo "</div>";
+			return;
+		}
 		$offset = 0;
 		if ( !empty( $_GET['cds_offset'] ) ) {
 			$get_offset = sanitize_text_field( $_GET['cds_offset'] );
@@ -1254,8 +1266,6 @@ class NPR_CDS {
 		}
 		echo '</p>';
 		$api = new NPR_CDS_WP();
-
-		$service_id = get_option( 'npr_cds_org_id' );
 		$service_ids = explode( ',', $service_id );
 		$owners = [];
 		foreach( $service_ids as $oi ) {
@@ -1274,10 +1284,12 @@ class NPR_CDS {
 		if ( empty( $api->message ) ) {
 			foreach ( $api->stories as $story ) {
 				$homepage_eligible = [
-					'overall' => 'No',
+					'homepage' => 'No',
+					'app' => 'No',
 					'collection' => 'No',
 					'publish-time' => 'No',
 					'image-wide-primary' => 'No',
+					'image-square-primary' => 'No',
 					'image-producer-credit' => 'No',
 					'image-provider-credit' => 'No',
 					'teaser' => 'No'
@@ -1345,12 +1357,21 @@ class NPR_CDS {
 								if ( in_array( 'primary', $enclosure->rels ) ) {
 									$image_src = $enclosure->href;
 								}
+								if ( in_array( 'image-square', $enclosure->rels ) ) {
+									$homepage_eligible['image-square-primary'] = 'Yes';
+								}
 							}
+							$image_producer_provider = '';
 							if ( !empty( $image_asset->producer ) ) {
 								$homepage_eligible['image-producer-credit'] = 'Yes';
+								$image_producer_provider = $image_asset->producer;
+							}
+							if ( !empty( $image_producer_provider ) ) {
+								$image_producer_provider .= ' / ';
 							}
 							if ( !empty( $image_asset->provider ) ) {
 								$homepage_eligible['image-provider-credit'] = 'Yes';
+								$image_producer_provider .= $image_asset->provider;
 							}
 
 							$primary_image = <<<EOT
@@ -1360,7 +1381,7 @@ class NPR_CDS {
 										<ul>
 											<li><strong>Profile:</strong> {$main_rel}</li>
 											<li><strong>Caption:</strong> {$image_asset->caption}</li>
-											<li><strong>Credit:</strong> {$image_asset->producer} / {$image_asset->provider}</li>
+											<li><strong>Credit:</strong> {$image_producer_provider}</li>
 										</ul>
 									</div>
 									<div>
@@ -1382,12 +1403,20 @@ EOT;
 					$homepage_eligible['image-provider-credit'] == 'Yes' &&
 					$homepage_eligible['teaser'] == 'Yes'
 				) {
-					$homepage_eligible['overall'] = 'Yes';
+					$homepage_eligible['homepage'] = 'Yes';
+					if ( $homepage_eligible['image-square-primary'] == 'Yes' ) {
+						$homepage_eligible['app'] = 'Yes';
+					}
 				}
 				$profiles = implode( ', ', $profiles_arr );
 				$owners = implode( ', ', $owners_arr );
 				$collections = implode( ', ', $collect_arr );
 				$bylines = implode( ', ', $bylines_arr );
+				$homepage_app = $homepage_eligible['homepage'] . ' / ' . $homepage_eligible['app'];
+				if ( $homepage_eligible['app'] === $homepage_eligible['homepage'] ) {
+					$homepage_app = $homepage_eligible['app'];
+				}
+
 				$homepage = <<<EOT
 					<details class="npr-homepage-eligible">
 						<summary>Why?</summary>
@@ -1397,6 +1426,7 @@ EOT;
 							<li class="homepage-{$homepage_eligible['publish-time']}">was published < 72 hours ago? <strong>{$homepage_eligible['publish-time']}</strong></li>
 							<li class="homepage-{$homepage_eligible['teaser']}">has a teaser/description with no formatting? <strong>{$homepage_eligible['teaser']}</strong></li>
 							<li class="homepage-{$homepage_eligible['image-wide-primary']}">has a wide primary image? <strong>{$homepage_eligible['image-wide-primary']}</strong></li>
+							<li class="homepage-{$homepage_eligible['image-square-primary']}">has a square crop of the primary image? <strong>{$homepage_eligible['image-square-primary']}</strong></li>
 							<li class="homepage-{$homepage_eligible['image-producer-credit']}">has an image producer/source? <strong>{$homepage_eligible['image-producer-credit']}</strong></li>
 							<li class="homepage-{$homepage_eligible['image-provider-credit']}">has an image provider/credit? <strong>{$homepage_eligible['image-provider-credit']}</strong></li>
 						</ul>
@@ -1408,7 +1438,7 @@ EOT;
 						<div class="cds-summary">
 							<div>{$story->title}</div>
 							<div>Published:<br><strong>{$publishTime}</strong></div>
-							<div>NPR Homepage Eligible:<br><strong>{$homepage_eligible['overall']}</strong></div>
+							<div>NPR Homepage/App Eligible:<br><strong>{$homepage_app}</strong></div>
 						</div>
 					</summary>
 					<div class="npr-grid">
@@ -1427,7 +1457,7 @@ EOT;
 							<p>Last Modified Date:<br><strong>{$lastModified}</strong></p>
 							<p><strong><a href="{$edit_link}">Edit in WordPress</a></strong></p>
 							<div class="npr-homepage">
-								<p class="homepage-eligible">NPR Homepage Eligible: <strong>{$homepage_eligible['overall']}</strong></p>
+								<p class="homepage-eligible">NPR Homepage/App Eligible: <strong>{$homepage_app}</strong></p>
 								{$homepage}
 							</div>
 						</div>
