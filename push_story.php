@@ -41,6 +41,11 @@ function npr_cds_push( int $post_ID, WP_Post $post ): void {
 		return;
 	}
 
+	$service_id = get_option( 'npr_cds_org_id' );
+	if ( empty( $service_id ) ) {
+		npr_cds_error_log( 'You do not currently have an organization ID set. Please check your settings.' );
+		return;
+	}
 
 	/*
 	 * If there's a custom mapping for the post content,
@@ -83,6 +88,11 @@ function npr_cds_push( int $post_ID, WP_Post $post ): void {
  * @param int $post_ID
  */
 function npr_cds_delete( int $post_ID ): void {
+	$post = get_post( $post_ID );
+	$push_post_type = npr_cds_get_push_post_type( get_post( $post_ID ) );
+	if ( $post->post_type !== $push_post_type ) {
+		return;
+	}
 	if ( !current_user_can( 'delete_others_posts' ) ) {
 		wp_die(
 			__('You do not have permission to delete posts in the NPR CDS. Users that can delete other users\' posts have that ability: administrators and editors.', ),
@@ -90,14 +100,11 @@ function npr_cds_delete( int $post_ID ): void {
 			403
 		);
 	}
-	$push_post_type = npr_cds_get_push_post_type( get_post( $post_ID ) );
-
 	$api_id = get_post_meta( $post_ID, NPR_STORY_ID_META_KEY, true );
 
-	$post = get_post( $post_ID );
 	//if the push url isn't set, don't even try to delete.
 	$push_url = get_option( 'npr_cds_push_url' );
-	if ( $post->post_type == $push_post_type && !empty( $push_url ) && !empty( $api_id ) ) {
+	if ( !empty( $push_url ) && !empty( $api_id ) ) {
 		$api = new NPR_CDS_WP();
 		$retrieved = get_post_meta( $post_ID, NPR_RETRIEVED_STORY_META_KEY, true );
 
@@ -215,7 +222,7 @@ function npr_cds_bulk_action_push_action(): void {
 function npr_cds_save_send_to_cds( Int $post_ID ): bool {
 	// safety checks
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return false;
-	if ( !current_user_can( 'edit_page', $post_ID ) ) return false;
+	if ( !current_user_can( 'edit_post', $post_ID ) ) return false;
 	if ( empty( $post_ID ) ) return false;
 	if ( !isset( $_POST['npr_cds_send_nonce'] ) || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['npr_cds_send_nonce'] ) ), 'npr_cds-' . $post_ID ) ) return false;
 	global $post;
@@ -240,7 +247,7 @@ add_action( 'save_post', 'npr_cds_save_send_to_cds', 15 );
 function npr_cds_save_send_to_one( int $post_ID ): bool {
 	// safety checks
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return false;
-	if ( !current_user_can( 'edit_page', $post_ID ) ) return false;
+	if ( !current_user_can( 'edit_post', $post_ID ) ) return false;
 	if ( empty( $post_ID ) ) return false;
 	if ( !isset( $_POST['npr_cds_send_nonce'] ) || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['npr_cds_send_nonce'] ) ), 'npr_cds-' . $post_ID ) ) return false;
 
@@ -270,7 +277,7 @@ add_action( 'save_post', 'npr_cds_save_send_to_one', 15 );
 function npr_cds_save_nprone_featured( int $post_ID ): bool {
 	// safety checks
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return false;
-	if ( !current_user_can( 'edit_page', $post_ID ) ) return false;
+	if ( !current_user_can( 'edit_post', $post_ID ) ) return false;
 	if ( empty( $post_ID ) ) return false;
 	if ( !isset( $_POST['npr_cds_send_nonce'] ) || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['npr_cds_send_nonce'] ) ), 'npr_cds-' . $post_ID ) ) return false;
 
@@ -304,7 +311,7 @@ add_action( 'save_post', 'npr_cds_save_nprone_featured', 15 );
 function npr_cds_save_datetime( int $post_ID ): bool {
 	// safety checks
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return false;
-	if ( !current_user_can( 'edit_page', $post_ID ) ) return false;
+	if ( !current_user_can( 'edit_post', $post_ID ) ) return false;
 	if ( empty( $post_ID ) ) return false;
 	if ( !isset( $_POST['npr_cds_send_nonce'] ) || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['npr_cds_send_nonce'] ) ), 'npr_cds-' . $post_ID ) ) return false;
 

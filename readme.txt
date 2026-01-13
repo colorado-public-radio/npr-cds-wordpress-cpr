@@ -6,8 +6,8 @@ Tags: npr, news, public radio, api
 Requires at least: 4.0
 Tested up to: 6.8.3
 Requires PHP: 8.0
-Version: 1.4
-Stable tag: 1.4
+Version: 1.4.7
+Stable tag: 1.4.7
 Author: Open Public Media
 Author URI: https://github.com/OpenPublicMedia/
 License: GPLv2
@@ -74,6 +74,29 @@ NPR Stories having been retrieved
 
 
 == Changelog ==
+= V.1.4.7 =
+* CDS Dashboard breaks out homepage and app eligibility information separately
+
+= V.1.4.6 =
+* CDS Dashboard updated to include NPR app eligibility information
+
+= V.1.4.5 =
+* Stories submitted to the CDS can now be featured in the NPR app, which requires a square crop of the images. That new crop is being added and the upload logic updated.
+
+= V.1.4.4 =
+* Bug fix in `push_story.php`: changed capability check when saving post metadata from `edit_page` to `edit_post` because the former does not exist
+
+= V.1.4.3 =
+* `npr_cds_delete()` now checks if the post type of the post being deleted matches the CDS Push Post Type before any further processing. If so, it then checks user capabilities and potentially errors and dies. Otherwise, it simply returns.
+* Bug fix in Uploaded Stories dashboard when stories have primary images without producer or provider credits
+
+= V.1.4.2 =
+* Small tweak to the logic for applying image credits. If the full credit is stored in one field or the agency and credit match, and the credit contains a separator (`/`, `|`, or `,`), then the credit is split and distributed.
+
+= V.1.4.1 =
+* Uploaded stories dashboard no longer displays anything if you don't have a valid CDS token, a valid pull URL, or an organization ID
+* Added a check to `npr_cds_push()` to make sure that an organization ID is present before trying to push a story
+
 = V.1.4 =
 * Consolidated all of the admin dashboard pages into a unified menu
 * Added a dashboard to view stories uploaded to the CDS. Contains general publishing information, as well as info on why or why not the story is eligible for the NPR homepage
