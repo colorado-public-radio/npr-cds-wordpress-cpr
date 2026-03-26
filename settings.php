@@ -284,6 +284,10 @@ class NPR_CDS {
 		</form><?php
 	}
 	public function settings_init(): void {
+		if ( is_plugin_active( 'npr-story-api/ds-npr-api.php' ) ) {
+			deactivate_plugins( 'npr-story-api/ds-npr-api.php' );
+			error_log( 'NPR Story API plugin deactivated by NPR CDS plugin. The NPR Story API plugin has been deprecated and cannot coexist with the newer CDS plugin.' );
+		}
 		/**
 		 * CDS: General Settings
 		 */
@@ -1079,7 +1083,26 @@ class NPR_CDS {
 				}
 			}
 		}
-		?>
+
+		$default_collection = '1002'; // NPR Home Page Top Stories.
+		$service_id = '';
+		if ( !empty( $_POST['collection_id'] ) || !empty( $_POST['service_id'] ) ) {
+			if ( !empty( $_POST['collection_id'] ) ) {
+				$default_collection = sanitize_text_field( $_POST['collection_id'] );
+				$service_id = '';
+			} elseif ( !empty( $_POST['service_id'] ) ) {
+				$service_id = sanitize_text_field( $_POST['service_id'] );
+				$default_collection = '';
+			}
+		}
+
+		$recent_documents = $this->get_latest_npr_stories( $default_collection, $service_id );
+		global $wpdb;
+		$post_type = get_option( 'npr_cds_pull_post_type', 'post' );
+		$post_query = '';
+		if ( $post_type !== 'post' ) {
+			$post_query = 'post_type=' . $post_type . '&';
+		} ?>
 
 		<div style="float: left;">
 			<form action="" method="POST">
@@ -1089,7 +1112,173 @@ class NPR_CDS {
 				<input type="submit" name='publishNow' value="Publish Now" />
 			</form>
 		</div>
+
+		<div class="wrap" style="width: 100%; display:block; clear:both; margin-block: 1rem;">
+			<h2>Filters:</h2>
+			<div style="margin-block-end: 1rem;">
+				<form method="POST" id="npr_cds_filter_form" action="<?php echo admin_url( 'edit.php?' . $post_query . 'page=get-npr-stories' ); ?>">
+					<label>Filter by collection ID <input type="text" class="npr_cds_search_filter" id="cds_collection_id" name="collection_id" placeholder="Collection ID" value="<?php echo $default_collection; ?>" /></label> &nbsp; &nbsp;
+					<label>Filter by service ID(s)* <input type="text" class="npr_cds_search_filter" id="cds_service_id" name="service_id" placeholder="Service ID" value="<?php echo $service_id; ?>" /></label>
+					<button type="submit">Search</button>
+				</form>
+				<p style="font-size: 0.75rem; font-style: italic;">* If you want to query more than one service ID, you may do so as a comma-separated list (e.g. 's220,s77,s252'). <a href="https://docs.google.com/spreadsheets/d/1taLIAUiBdevf39LhUj-Kg6xUKiUPbb9KyU0Y9pOqhA0/edit?usp=sharing" target="_blank">CDS Service IDs can be found here</a>.</p>
+
+			</div>
+			<table class="wp-list-table widefat fixed striped table-view-list posts">
+				<thead>
+				<tr>
+					<th style="width: 10%;">CDS ID</th>
+					<th style="width: 45%;">Title</th>
+					<th style="width: 15%;">Publish Date</th>
+					<th style="width: 15%;">Organization</th>
+					<th style="width: 7.5%;">Action</th>
+					<th style="width: 7.5%;">Imported</th>
+				</tr>
+				</thead>
+				<tbody>
+				<?php
+				if ( !empty( $recent_documents ) ) {
+					$orgs = [];
+					foreach ( $recent_documents as $story ) {
+						$results = $wpdb->get_col(
+							$wpdb->prepare(
+								"SELECT post_id 
+									FROM $wpdb->postmeta 
+									WHERE meta_key = %s 
+									AND meta_value = %s",
+								NPR_STORY_ID_META_KEY, $story->id
+							)
+						);
+						$webpage = '';
+						$title = esc_html( $story->title );
+						foreach ( $story->webPages as $page ) {
+							if ( !empty( $page->rels ) && in_array( 'canonical', $page->rels ) ) {
+								$webpage = $page->href;
+							}
+						}
+						if ( !empty( $webpage ) ) {
+							$title = '<a href="' . esc_attr( $webpage ) . '" target="_blank">' . $title . '</a>';
+						}
+						$owners = [];
+						foreach ( $story->owners as $owner ) {
+							$org_id = str_replace( 'https://organization.api.npr.org/v4/services/','', $owner->href );
+							if ( empty( $orgs[ $org_id ] ) ) {
+								$response = wp_remote_get( $owner->href );
+								if ( !is_wp_error( $response ) ) {
+									$body = wp_remote_retrieve_body( $response );
+									$orgs[ $org_id ] = json_decode( $body, true );
+									$owners[] = $orgs[ $org_id ]['name'];
+								} else {
+									$owners[] = $org_id;
+								}
+							} else {
+								$owners[] = $orgs[ $org_id ]['name'];
+							}
+						}
+						$date_format = get_option( 'date_format' );
+						$gmt_offset = get_option( 'gmt_offset' ) * 3600;
+						$pubTimestamp = strtotime( $story->publishDateTime ) + $gmt_offset;
+						$publishTime = date( $date_format, $pubTimestamp ); ?>
+						<tr>
+							<td><?php esc_html_e( $story->id ); ?></td>
+							<td><strong><?php echo $title; ?></strong></td>
+							<td><?php esc_html_e( $publishTime ); ?></td>
+							<td><?php esc_html_e( implode( ', ', $owners ) ); ?></td>
+							<td><form method="POST"><input name="story_id" hidden value="<?php echo esc_attr( $story->id ); ?>" /><?php wp_nonce_field( 'npr_cds_nonce_story_id', 'npr_cds_nonce_story_id_field' ); ?><button type="submit">Pull/Update</button></form></td>
+							<td style="color: green;"><?php esc_html_e( ( $results ? 'Yes' : '' ) ); ?></td>
+						</tr>
+						<?php
+					}
+				} else { ?>
+					<tr>
+						<td colspan="6">Sorry, that collection ID/service ID does not contain any importable stories. Please try a different one.</td>
+					</tr>
+					<?php
+				}
+				?>
+				</tbody>
+			</table>
+
+		</div>
+		<script>
+			document.addEventListener('DOMContentLoaded', () => {
+				let fields = document.querySelectorAll('.npr_cds_search_filter');
+				Array.from(fields).forEach((field) => {
+					field.addEventListener('keyup', (e) => {
+						if ( e.target.id === 'cds_collection_id' ) {
+							document.querySelector('#cds_service_id').value = '';
+						} else if ( e.target.id === 'cds_service_id' ) {
+							document.querySelector('#cds_collection_id').value = '';
+						}
+					});
+				});
+				let form = document.querySelector('#npr_cds_filter_form');
+				form.addEventListener('submit', (e) => {
+					e.preventDefault();
+					const data = new FormData(form);
+					for (const [name,value] of data) {
+						if (name === 'collection_id') {
+							if (isNaN(value)) {
+								alert('Collection IDs can only contain numbers. Please try again.');
+								return false;
+							}
+						} else if (name === 'service_id') {
+							if (!/^[s0-9, ]+$/.test(value)) {
+								alert('The service ID will only accept numbers, commas, and the letter \'s\'. Please try again.');
+								return false;
+							}
+						}
+					}
+					form.submit();
+				})
+			});
+		</script>
 		</div><?php
+	}
+
+	public function get_latest_npr_stories( $collection_id, $service_id ): array {
+		$params = [
+			'collectionIds' => $collection_id,
+			'limit'         => 50,
+			'profileIds'    => [ 'renderable', 'story', 'buildout' ],
+			'sort'          => 'publishDateTime:desc',
+		];
+		if ( !empty( $service_id ) && preg_match( '/^[s0-9 ,]+$/', $service_id ) ) {
+			$ids = explode( ',', $service_id );
+			foreach ( $ids as $k => $id ) {
+				$id = str_replace( 's', '', strtolower( trim( $id ) ) );
+				$ids[ $k ] = 'https://organization.api.npr.org/v4/services/s' . $id;
+			}
+			if ( !empty( $ids ) ) {
+				unset( $params['collectionIds'] );
+				$params['ownerHrefs'] = implode( ',', $ids );
+			}
+		}
+
+		$response = new NPR_CDS_WP();
+		$response->request( $params );
+		$response->parse();
+
+		return $response->stories;
+	}
+
+	public function get_wordcount_assets( $story ): int {
+		$cds_wp = new NPR_CDS_WP();
+		$text = [];
+		foreach ( $story->layout as $layout ) {
+			$asset_id = $cds_wp->extract_asset_id( $layout->href );
+			$asset_current = $story->assets->{ $asset_id };
+			$asset_profile = $cds_wp->extract_asset_profile( $asset_current );
+			if ( $asset_profile === 'text' && !empty( $asset_current->text ) ) {
+				$text[] = $asset_current->text;
+			}
+		}
+		if ( empty( $text ) ) {
+			return 0;
+		} else {
+			$text_str = implode( ' ', $text );
+			return str_word_count( strip_tags( $text_str ) );
+		}
 	}
 	public function view_uploads(): void {
 		$api_key = NPR_CDS_WP::get_cds_token();
@@ -1292,7 +1481,8 @@ class NPR_CDS {
 					'image-square-primary' => 'No',
 					'image-producer-credit' => 'No',
 					'image-provider-credit' => 'No',
-					'teaser' => 'No'
+					'teaser' => 'No',
+					'word-count' => 'No'
 				];
 				$date_format = get_option( 'date_format' );
 				$gmt_offset = get_option( 'gmt_offset' ) * 3600;
@@ -1305,6 +1495,11 @@ class NPR_CDS {
 				$lastModified = date( $date_format, strtotime( $story->editorialLastModifiedDateTime ) + $gmt_offset );
 				$local_id = explode( '-', $story->id )[1];
 				$edit_link = admin_url( 'post.php?post=' . $local_id . '&action=edit');
+				$word_count = $this->get_wordcount_assets( $story );
+
+				if ( $word_count >= 200 ) {
+					$homepage_eligible['word-count'] = 'Yes';
+				}
 				$profiles_arr = $owners_arr = $collect_arr = $bylines_arr = $images_arr = [];
 				$primary_image = '<div class="npr-images"><div><p><strong>Primary Image:</strong><br>None</p></div></div>';
 				if ( !empty( $story->profiles ) ) {
@@ -1401,7 +1596,8 @@ EOT;
 					$homepage_eligible['image-wide-primary'] == 'Yes' &&
 					$homepage_eligible['image-producer-credit'] == 'Yes' &&
 					$homepage_eligible['image-provider-credit'] == 'Yes' &&
-					$homepage_eligible['teaser'] == 'Yes'
+					$homepage_eligible['teaser'] == 'Yes' &&
+					$homepage_eligible['word-count'] == 'Yes'
 				) {
 					$homepage_eligible['homepage'] = 'Yes';
 					if ( $homepage_eligible['image-square-primary'] == 'Yes' ) {
@@ -1425,6 +1621,7 @@ EOT;
 							<li class="homepage-{$homepage_eligible['collection']}">is in the NPR One collection? <strong>{$homepage_eligible['collection']}</strong></li>
 							<li class="homepage-{$homepage_eligible['publish-time']}">was published < 72 hours ago? <strong>{$homepage_eligible['publish-time']}</strong></li>
 							<li class="homepage-{$homepage_eligible['teaser']}">has a teaser/description with no formatting? <strong>{$homepage_eligible['teaser']}</strong></li>
+							<li class="homepage-{$homepage_eligible['word-count']}">has 200+ words of body content? <strong>{$homepage_eligible['word-count']}</strong></li>
 							<li class="homepage-{$homepage_eligible['image-wide-primary']}">has a wide primary image? <strong>{$homepage_eligible['image-wide-primary']}</strong></li>
 							<li class="homepage-{$homepage_eligible['image-square-primary']}">has a square crop of the primary image? <strong>{$homepage_eligible['image-square-primary']}</strong></li>
 							<li class="homepage-{$homepage_eligible['image-producer-credit']}">has an image producer/source? <strong>{$homepage_eligible['image-producer-credit']}</strong></li>
@@ -1444,6 +1641,7 @@ EOT;
 					<div class="npr-grid">
 						<div>
 							<p><strong>Teaser:</strong><br>{$story->teaser}</p>
+							<p><strong>Body Word Count:</strong><br>{$word_count}</p>
 							{$primary_image}
 						</div>
 						<div>
