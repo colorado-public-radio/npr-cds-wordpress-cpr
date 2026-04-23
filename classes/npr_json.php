@@ -326,11 +326,10 @@ function npr_cds_to_json( $post ): bool|string {
 		// Is the image in the content?  If so, tell the API with a flag that CorePublisher knows.
 		// WordPress may add something like "-150X150" to the end of the filename, before the extension.
 		// Isn't that nice? Let's remove that.
-		$image_attach_url = wp_get_attachment_url( $image->ID );
 		$image_url = parse_url( $image_attach_url );
 		$image_name_parts = pathinfo( $image_url['path'] );
 
-		$image_regex = "/" . $image_name_parts['filename'] . "\-[a-zA-Z0-9]*" . $image_name_parts['extension'] . "/";
+		$image_regex = "/" . $image_name_parts['filename'] . "\-[xX0-9]+\." . $image_name_parts['extension'] . "/";
 		$in_body = "";
 		if ( preg_match( $image_regex, $content ) ) {
 			if ( str_contains( $image_attach_url, '?' ) ) {
@@ -373,6 +372,9 @@ function npr_cds_to_json( $post ): bool|string {
 				}
 				$image_enc = new stdClass;
 				$image_enc->href = str_replace( $image_name_parts['basename'], $value['file'], $image_attach_url ) . $in_body;
+				if ( has_filter( 'npr_cds_image_attach_filter' ) ) {
+					$image_enc->href = apply_filters( 'npr_cds_image_attach_filter', $image_attach_url, $value, $in_body );
+				}
 				$image_enc->rels = [];
 				$aspect_ratio = $value['width'] / $value['height'];
 				if ( ( $aspect_ratio > 1.7 && $aspect_ratio < 1.8 ) ) {
