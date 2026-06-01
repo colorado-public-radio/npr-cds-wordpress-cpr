@@ -372,7 +372,20 @@ function npr_cds_to_json( $post ): bool|string {
 					continue;
 				}
 				$image_enc = new stdClass;
-				$image_enc->href = str_replace( $image_name_parts['basename'], $value['file'], $image_attach_url ) . $in_body;
+				// $image_enc->href = str_replace( $image_name_parts['basename'], $value['file'], $image_attach_url ) . $in_body;
+				// Testing Fix -  applies the image attach filter to CDS image enclosures to catch both wide and square crops
+				$fallback_href = str_replace( $image_name_parts['basename'], $value['file'], $image_attach_url ) . $in_body;
+				$image_enc->href = $fallback_href;
+
+				if ( has_filter( 'npr_cds_image_attach_filter' ) ) {
+					$image_enc->href = apply_filters(
+						'npr_cds_image_attach_filter',
+						$image_attach_url,
+						$value,
+						$in_body
+					);
+				}
+				// Testing Fix ^
 				$image_enc->rels = [];
 				$aspect_ratio = $value['width'] / $value['height'];
 				if ( ( $aspect_ratio > 1.7 && $aspect_ratio < 1.8 ) ) {
