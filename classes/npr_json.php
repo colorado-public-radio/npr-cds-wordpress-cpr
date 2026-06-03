@@ -434,8 +434,8 @@ function npr_cds_to_json( $post ): bool|string {
 		/**
 		 * DP-668: Create missing wide/square image enclosures.
 		 *
-		 * Some attachments lack the crops that NPR needs to feature a stories image. 
-		 * This function looks for any missing aspects, calls filter to create a URL for the 
+		 * Some attachments lack the crops that NPR needs to feature a stories image.
+		 * This function looks for any missing aspects, calls filter to create a URL for the
 		 * missing crop, and if a URL is returned, adds an enclosure.
 		 * If no filter callback returns a URL, no enclosure is created.
 		 */
