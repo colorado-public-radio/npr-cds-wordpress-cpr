@@ -373,7 +373,12 @@ function npr_cds_to_json( $post ): bool|string {
 				$image_enc = new stdClass;
 				$image_enc->href = str_replace( $image_name_parts['basename'], $value['file'], $image_attach_url ) . $in_body;
 				if ( has_filter( 'npr_cds_image_attach_filter' ) ) {
-					$image_enc->href = apply_filters( 'npr_cds_image_attach_filter', $image_attach_url, $value, $in_body );
+					$image_enc->href = apply_filters(
+						'npr_cds_image_attach_filter',
+						$image_attach_url,
+						$value,
+						$in_body
+					);
 				}
 				$image_enc->rels = [];
 				$aspect_ratio = $value['width'] / $value['height'];
@@ -425,6 +430,64 @@ function npr_cds_to_json( $post ): bool|string {
 			$image_enc->rels = array_values( array_unique( $image_enc->rels ) );
 			$image_asset->enclosures[] = $image_enc;
 		}
+
+		/**
+		 * DP-668: Create missing wide/square image enclosures.
+		 *
+		 * Some attachments lack the crops that NPR needs to feature a stories image.
+		 * This function looks for any missing aspects, calls filter to create a URL for the
+		 * missing crop, and if a URL is returned, adds an enclosure.
+		 * If no filter callback returns a URL, no enclosure is created.
+		 */
+		if ( has_filter( 'npr_cds_create_crop_url' ) ) {
+			$has_wide   = false;
+			$has_square = false;
+			foreach ( $image_asset->enclosures as $existing_enc ) {
+				if ( empty( $existing_enc->rels ) ) {
+					continue;
+				}
+				if ( in_array( 'image-wide', $existing_enc->rels, true ) ) {
+					$has_wide = true;
+				}
+				if ( in_array( 'image-square', $existing_enc->rels, true ) ) {
+					$has_square = true;
+				}
+			}
+
+			$new_targets = [];
+			if ( ! $has_wide ) {
+				$new_targets[] = [ 'aspect' => 'wide',   'w' => 1200, 'h' => 675, 'rel' => 'image-wide',   'promo' => 'promo-image-wide' ];
+			}
+			if ( ! $has_square ) {
+				$new_targets[] = [ 'aspect' => 'square', 'w' => 600,  'h' => 600, 'rel' => 'image-square', 'promo' => 'promo-image-square' ];
+			}
+
+			foreach ( $new_targets as $target ) {
+				$new_url = apply_filters(
+					'npr_cds_create_crop_url',
+					false,
+					$image->ID,
+					$target['aspect'],
+					$target['w'],
+					$target['h']
+				);
+
+				if ( empty( $new_url ) || ! is_string( $new_url ) ) {
+					continue;
+				}
+
+				$new_enc = new stdClass;
+				$new_enc->href   = $new_url . $in_body;
+				$new_enc->rels   = [ $target['rel'] ];
+				$new_enc->type   = $image->post_mime_type;
+				$new_enc->width  = $target['w'];
+				$new_enc->height = $target['h'];
+				$image_asset->enclosures[] = $new_enc;
+				$new_image_rels[] = $target['promo'];
+
+			}
+		}
+
 		$story->assets->{$image_asset_id} = $image_asset;
 		if ( in_array( 'promo-image-wide', $new_image_rels ) ) {
 			$new_image_rels = [ 'promo-image-wide' ];
