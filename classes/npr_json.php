@@ -251,7 +251,7 @@ function npr_cds_to_json( $post ): bool|string {
 		'post_mime_type' => 'image',
 		'post_parent' => $post->ID,
 		'post_status' => null,
-		'post_type' => 'attachments'
+		'post_type' => 'attachment'
 	];
 
 	$images = get_children( $args );
