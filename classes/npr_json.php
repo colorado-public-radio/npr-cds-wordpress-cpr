@@ -507,6 +507,39 @@ function npr_cds_to_json( $post ): bool|string {
 		$image_asset_ids_by_attachment_id[ (int) $image->ID ] = $image_asset_id;
 	}
 
+	// DP-700: Add image references to CDS layout.
+	if ( ! empty( $story->layout ) ) {
+		$layout_with_images = [];
+
+		foreach ( $story->layout as $layout_item ) {
+			$layout_with_images[] = $layout_item;
+
+			$layout_asset_id = str_replace( '#/assets/', '', $layout_item->href );
+			if ( empty( $story->assets->{$layout_asset_id}->html ) ) {
+				continue;
+			}
+
+			$html = $story->assets->{$layout_asset_id}->html;
+			if ( ! preg_match_all( '/wp-image-([0-9]+)/', $html, $matches ) ) {
+				continue;
+			}
+
+			foreach ( array_unique( $matches[1] ) as $attachment_id ) {
+				$attachment_id = (int) $attachment_id;
+
+				if ( empty( $image_asset_ids_by_attachment_id[ $attachment_id ] ) ) {
+					continue;
+				}
+
+				$inline_image_layout_item = new stdClass;
+				$inline_image_layout_item->href = '#/assets/' . $image_asset_ids_by_attachment_id[ $attachment_id ];
+				$layout_with_images[] = $inline_image_layout_item;
+			}
+		}
+
+		$story->layout = $layout_with_images;
+	}
+
 	/*
 	 * Attach audio to the post
 	 *
