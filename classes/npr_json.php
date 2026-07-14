@@ -272,6 +272,9 @@ function npr_cds_to_json( $post ): bool|string {
 		$story->profiles[] = $image_profile;
 	}
 
+	// DP-700: Map attachment IDs to CDS image asset IDs for layout references.
+	$image_asset_ids_by_attachment_id = [];
+
 	foreach ( $images as $image ) {
 		$image_attach_url = wp_get_attachment_url( $image->ID );
 		if ( $image_attach_url === false ) {
@@ -499,6 +502,9 @@ function npr_cds_to_json( $post ): bool|string {
 		$new_image->rels = array_values( array_merge( $new_image_rels, $image_type ) );
 		$new_image->href = '#/assets/' . $image_asset_id;
 		$story->images[] = $new_image;
+
+		// DP-700: Store CDS asset IDs for layout.
+		$image_asset_ids_by_attachment_id[ (int) $image->ID ] = $image_asset_id;
 	}
 
 	/*
