@@ -255,6 +255,28 @@ function npr_cds_to_json( $post ): bool|string {
 	];
 
 	$images = get_children( $args );
+
+	// DP-700: Include inline image block attachments even when they are unattached.
+	$inline_image_ids = [];
+	if ( preg_match_all( '/wp-image-([0-9]+)/', $post->post_content, $matches ) ) {
+		$inline_image_ids = array_unique( $matches[1] );
+
+		foreach ( $inline_image_ids as $attachment_id ) {
+			$attachment_id = (int) $attachment_id;
+
+			if ( isset( $images[ $attachment_id ] ) ) {
+				continue;
+			}
+
+			$inline_image = get_post( $attachment_id );
+			if ( empty( $inline_image ) || 'attachment' !== $inline_image->post_type ) {
+				continue;
+			}
+
+			$images[ $attachment_id ] = $inline_image;
+		}
+	}
+
 	$primary_image = get_post_thumbnail_id( $post->ID );
 
 	if ( $primary_image !== false && $primary_image !== 0 && empty( $images[ $primary_image ] ) ) {
