@@ -534,21 +534,22 @@ function npr_cds_to_json( $post ): bool|string {
 		$layout_with_images = [];
 
 		foreach ( $story->layout as $layout_item ) {
-			$layout_with_images[] = $layout_item;
-
 			$layout_asset_id = str_replace( '#/assets/', '', $layout_item->href );
+
 			if ( empty( $story->assets->{$layout_asset_id}->html ) ) {
+				$layout_with_images[] = $layout_item;
 				continue;
 			}
 
 			$html = $story->assets->{$layout_asset_id}->html;
 			if ( ! preg_match_all( '/wp-image-([0-9]+)/', $html, $matches ) ) {
+				$layout_with_images[] = $layout_item;
 				continue;
 			}
 
-			foreach ( array_unique( $matches[1] ) as $attachment_id ) {
-				$attachment_id = (int) $attachment_id;
+			$added_structured_image = false;
 
+			foreach ( array_unique( array_map( 'intval', $matches[1] ) ) as $attachment_id ) {
 				if ( empty( $image_asset_ids_by_attachment_id[ $attachment_id ] ) ) {
 					continue;
 				}
@@ -556,6 +557,11 @@ function npr_cds_to_json( $post ): bool|string {
 				$inline_image_layout_item = new stdClass;
 				$inline_image_layout_item->href = '#/assets/' . $image_asset_ids_by_attachment_id[ $attachment_id ];
 				$layout_with_images[] = $inline_image_layout_item;
+				$added_structured_image = true;
+			}
+
+			if ( ! $added_structured_image ) {
+				$layout_with_images[] = $layout_item;
 			}
 		}
 
