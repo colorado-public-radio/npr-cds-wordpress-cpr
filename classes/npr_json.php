@@ -251,10 +251,32 @@ function npr_cds_to_json( $post ): bool|string {
 		'post_mime_type' => 'image',
 		'post_parent' => $post->ID,
 		'post_status' => null,
-		'post_type' => 'attachments'
+		'post_type' => 'attachment'
 	];
 
 	$images = get_children( $args );
+
+	// DP-700: Include inline image block attachments even when they are unattached.
+	$inline_image_ids = [];
+	if ( preg_match_all( '/wp-image-([0-9]+)/', $post->post_content, $matches ) ) {
+		$inline_image_ids = array_unique( $matches[1] );
+
+		foreach ( $inline_image_ids as $attachment_id ) {
+			$attachment_id = (int) $attachment_id;
+
+			if ( isset( $images[ $attachment_id ] ) ) {
+				continue;
+			}
+
+			$inline_image = get_post( $attachment_id );
+			if ( empty( $inline_image ) || 'attachment' !== $inline_image->post_type ) {
+				continue;
+			}
+
+			$images[ $attachment_id ] = $inline_image;
+		}
+	}
+
 	$primary_image = get_post_thumbnail_id( $post->ID );
 
 	if ( $primary_image !== false && $primary_image !== 0 && empty( $images[ $primary_image ] ) ) {
@@ -271,6 +293,9 @@ function npr_cds_to_json( $post ): bool|string {
 		$image_profile->rels = [ 'interface' ];
 		$story->profiles[] = $image_profile;
 	}
+
+	// DP-700: Map attachment IDs to CDS image asset IDs for layout references.
+	$image_asset_ids_by_attachment_id = [];
 
 	foreach ( $images as $image ) {
 		$image_attach_url = wp_get_attachment_url( $image->ID );
@@ -499,6 +524,48 @@ function npr_cds_to_json( $post ): bool|string {
 		$new_image->rels = array_values( array_merge( $new_image_rels, $image_type ) );
 		$new_image->href = '#/assets/' . $image_asset_id;
 		$story->images[] = $new_image;
+
+		// DP-700: Store CDS asset IDs for layout.
+		$image_asset_ids_by_attachment_id[ (int) $image->ID ] = $image_asset_id;
+	}
+
+	// DP-700: Add image references to CDS layout.
+	if ( ! empty( $story->layout ) ) {
+		$layout_with_images = [];
+
+		foreach ( $story->layout as $layout_item ) {
+			$layout_asset_id = str_replace( '#/assets/', '', $layout_item->href );
+
+			if ( empty( $story->assets->{$layout_asset_id}->html ) ) {
+				$layout_with_images[] = $layout_item;
+				continue;
+			}
+
+			$html = $story->assets->{$layout_asset_id}->html;
+			if ( ! preg_match_all( '/wp-image-([0-9]+)/', $html, $matches ) ) {
+				$layout_with_images[] = $layout_item;
+				continue;
+			}
+
+			$added_structured_image = false;
+
+			foreach ( array_unique( array_map( 'intval', $matches[1] ) ) as $attachment_id ) {
+				if ( empty( $image_asset_ids_by_attachment_id[ $attachment_id ] ) ) {
+					continue;
+				}
+
+				$inline_image_layout_item = new stdClass;
+				$inline_image_layout_item->href = '#/assets/' . $image_asset_ids_by_attachment_id[ $attachment_id ];
+				$layout_with_images[] = $inline_image_layout_item;
+				$added_structured_image = true;
+			}
+
+			if ( ! $added_structured_image ) {
+				$layout_with_images[] = $layout_item;
+			}
+		}
+
+		$story->layout = $layout_with_images;
 	}
 
 	/*
