@@ -4,10 +4,10 @@ Original developers: NPRDS, INN Labs
 Donate link: https://www.npr.org/support
 Tags: npr, news, public radio, api
 Requires at least: 4.0
-Tested up to: 6.8.3
+Tested up to: 7.0.3
 Requires PHP: 8.0
-Version: 1.5.4
-Stable tag: 1.5.4
+Version: 1.5.8
+Stable tag: 1.5.8
 Author: Open Public Media
 Author URI: https://github.com/OpenPublicMedia/
 License: GPLv2
@@ -74,6 +74,20 @@ NPR Stories having been retrieved
 
 
 == Changelog ==
+= V.1.5.8 =
+* Adding an additional step when attempting to pull in a CDS article via a URL, due to Cloudflare's bot mitigations. It now attempts to download the article using the "NPR CDS Bot" user agent
+
+= V.1.5.7 =
+* Bug fix: `send_to_cds` checkbox was sometimes not being recognized as checked in editor, which was preventing the Send to CDS metadata from being saved
+
+= V.1.5.6 =
+* Bug fix: When viewing uploaded stories, a story that is not licensed for syndication will no longer preclude the plugin from showing the rest of the list
+
+= V.1.5.5 =
+* Adding support for NPR Network Aggregations, which will allow stories uploaded to the CDS to be displayed in more places across NPR's site and apps
+* Fixed a bug that was preventing articles from being pushed to the CDS when being scheduled to publish
+* Fixed a logic issue that was preventing the "Include for NPR One and NPR homepage/app" checkbox state from being properly represented
+
 = V.1.5.4 =
 * Fixed a bug in which the wrong Co-Authors Plus function was called when pulling the byline to insert into the page header metadata
 
